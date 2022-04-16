@@ -39,6 +39,119 @@ namespace AssetStudio
 
         public StreamFile[] fileList;
 
+        public EndianBinaryWriter Write(Stream stream)
+        {
+            var writer = new EndianBinaryWriter(stream);
+            writer.WriteStringNull(m_Header.signature);
+            writer.Write(m_Header.version);
+            writer.WriteStringNull(m_Header.unityVersion);
+            writer.WriteStringNull(m_Header.unityRevision);
+            // FS Header
+            /*
+            m_Header.size = reader.ReadInt64();
+            m_Header.compressedBlocksInfoSize = reader.ReadUInt32();
+            m_Header.uncompressedBlocksInfoSize = reader.ReadUInt32();
+            m_Header.flags = reader.ReadUInt32();
+            if (m_Header.signature != "UnityFS")
+            {
+                reader.ReadByte();
+            }
+             * 
+             */
+
+            var blockData = GetBlockData();
+
+            var compressedBytes = new byte[m_Header.uncompressedBlocksInfoSize];
+            var compressedSize = GetBlockInfo(compressedBytes);
+
+
+            writer.Write(m_Header.size);
+            writer.Write(compressedSize);
+            writer.Write(m_Header.uncompressedBlocksInfoSize);
+            writer.Write(m_Header.flags);
+
+            //BLOCK INFO
+            writer.AlignStream(16);
+
+            writer.Write(compressedBytes, 0, compressedSize);
+            writer.Write(blockData);
+
+            return writer;
+        }
+
+        private byte[] GetBlockData()
+        {
+            var stream = new MemoryStream();
+
+            foreach (var file in fileList)
+            {
+                //file.stream.Seek(0, SeekOrigin.Begin);
+                file.stream.Position = 0;
+                file.stream.CopyTo(stream);
+            }
+
+            stream.Position = 0;
+            //stream = new MemoryStream();
+
+            int BLOCK_SIZE = 128 * 1024;
+            var compressed = new byte[BLOCK_SIZE];
+
+            var retstream = new MemoryStream();
+
+            while (stream.Position < stream.Length)
+            {
+                var tarsize = Math.Min(BLOCK_SIZE, (int)(stream.Length - stream.Position));
+                var realuncompressed = new byte[tarsize];
+                var readsize = stream.Read(realuncompressed, 0, tarsize);
+                
+                var encodesize = LZ4Codec.Encode(realuncompressed, compressed, LZ4Level.L12_MAX);
+                retstream.Write(compressed, 0, encodesize);
+                //BigArrayPool<byte>.Shared.Return(realuncompressed);
+            }
+
+            var ret = new byte[retstream.Length];
+            retstream.Position = 0;
+            retstream.Read(ret);
+            return ret;
+        }
+
+        private int GetBlockInfo(byte[] compressedBytes) {
+
+            var blocksinfobytes = new byte[m_Header.uncompressedBlocksInfoSize];
+            var blocksinfostream = new MemoryStream(blocksinfobytes);
+            using (var blocksinfoWriter = new EndianBinaryWriter(blocksinfostream))
+            {
+                blocksinfoWriter.Write(new byte[16]); // Hash
+                blocksinfoWriter.Write(m_BlocksInfo.Length);
+
+                foreach (var block in m_BlocksInfo)
+                {
+                    blocksinfoWriter.Write(block.uncompressedSize);
+                    blocksinfoWriter.Write(block.compressedSize);
+                    blocksinfoWriter.Write(block.flags);
+                }
+
+                blocksinfoWriter.Write(m_DirectoryInfo.Length);
+
+                foreach (var node in m_DirectoryInfo)
+                {
+                    blocksinfoWriter.Write(node.offset);
+                    blocksinfoWriter.Write(node.size);
+                    blocksinfoWriter.Write(node.flags);
+                    blocksinfoWriter.WriteStringNull(node.path);
+                }
+            }
+            var compressedSize = LZ4Codec.Encode(blocksinfobytes, compressedBytes, LZ4Level.L12_MAX);
+
+            Console.WriteLine(m_Header.compressedBlocksInfoSize);
+            foreach (var compresst in (LZ4Level[])Enum.GetValues(typeof(LZ4Level)))
+            {
+                var size = LZ4Codec.Encode(blocksinfobytes, compressedBytes, compresst);
+                Console.WriteLine("true : {0} type {1} now {2} ", m_Header.compressedBlocksInfoSize, compresst, size);
+            }
+            return compressedSize;
+        }
+
         public BundleFile(FileReader reader)
         {
             m_Header = new Header();

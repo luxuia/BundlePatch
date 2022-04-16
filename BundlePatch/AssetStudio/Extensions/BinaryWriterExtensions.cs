@@ -28,7 +28,7 @@ namespace AssetStudio
         {
             var bytes = Encoding.UTF8.GetBytes(str);
             writer.Write(bytes);
-            writer.Write(0);
+            writer.Write((byte)0);
         }
     }
 }

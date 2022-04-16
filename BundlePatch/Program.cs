@@ -56,6 +56,8 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
             var ret = "/Users/luxuia/Documents/Demo/Assets/tex_patched";
 
+            TestWriteBundleFile();
+
             foreach (var obj in topatchlist)
             {
                 switch (obj)
@@ -68,6 +70,28 @@ namespace MyApp // Note: actual namespace depends on the project name.
                     default:
                         break;
                 }
+            }
+        }
+
+
+        static void TestWriteBundleFile()
+        {
+            var oldpath = "/Users/luxuia/Documents/Demo/Assets/tex";
+            var ret = "/Users/luxuia/Documents/Demo/Assets/tex_patched";
+            var reader = new FileReader(oldpath);
+
+            var bundleFile = new BundleFile(reader);
+
+            using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write))
+            {
+                bundleFile.Write(streamer);
+            }
+
+
+            var patchbundle = new BundleFile(new FileReader(ret));
+            foreach (var file in patchbundle.fileList)
+            {
+
             }
         }
     }
