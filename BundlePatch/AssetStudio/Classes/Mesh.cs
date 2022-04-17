@@ -444,7 +444,9 @@ namespace AssetStudio
         }
     }
 
-    public sealed class Mesh : NamedObject, IExternalData
+    public interface IBuildinData { }
+
+    public sealed class Mesh : NamedObject, IExternalData, IBuildinData
     {
         private bool m_Use16BitIndices = true;
         public SubMesh[] m_SubMeshes;

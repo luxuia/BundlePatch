@@ -39,7 +39,7 @@ namespace AssetStudio
 
         public StreamFile[] fileList;
 
-        public EndianBinaryWriter Write(Stream stream, List<IExternalData> topatchlist)
+        public EndianBinaryWriter Write(Stream stream, List<NamedObject> topatchlist)
         {
             var writer = new EndianBinaryWriter(stream);
             writer.WriteStringNull(m_Header.signature);
@@ -79,19 +79,34 @@ namespace AssetStudio
             return writer;
         }
 
-        private byte[] GetBlockData(List<IExternalData> topatchlist)
+
+        private byte[] GetBlockData(List<NamedObject> topatchlist)
         {
-            Dictionary<string, List<IExternalData>> patchdic = new Dictionary<string, List<IExternalData>>();
+            Dictionary<string, List<StreamingInfo>> patchdic = new Dictionary<string, List<StreamingInfo>>();
             foreach (var patch in topatchlist)
             {
-                List<IExternalData> list;
-                var filename = Path.GetFileName(patch.m_StreamData.path);
-                if (!patchdic.TryGetValue(filename, out list))
+                List<StreamingInfo> list;
+                var info = new StreamingInfo();
+                if (patch is IExternalData extdata && extdata.m_StreamData.size > 0)
                 {
-                    list = new List<IExternalData>();
+                    info.path = Path.GetFileName(extdata.m_StreamData.path);
+                    info.offset = extdata.m_StreamData.offset;
+                    info.size = extdata.m_StreamData.size;
+                } else if (patch is IBuildinData)
+                {
+                    info.path = patch.assetsFile.fileName;
+                    info.offset = patch.reader.byteStart;
+                    info.size = patch.reader.byteSize;
                 }
-                list.Add(patch);
-                patchdic[filename] = list;
+                if (!string.IsNullOrEmpty(info.path))
+                {
+                    if (!patchdic.TryGetValue(info.path, out list))
+                    {
+                        list = new List<StreamingInfo>();
+                    }
+                    list.Add(info);
+                    patchdic[info.path] = list;
+                }
             }
 
             var stream = new MemoryStream();
@@ -100,18 +115,16 @@ namespace AssetStudio
             {
                 //file.stream.Seek(0, SeekOrigin.Begin);
 
-                List<IExternalData> list;
+                List<StreamingInfo> list;
                 if (patchdic.TryGetValue(file.path, out list))
                 {
                     var buffer = (file.stream as MemoryStream).GetBuffer();
-                    foreach (var patch in list)
+                    foreach (var streamdata in list)
                     {
-                        var streamdata = patch.m_StreamData;
                         //file.stream.Position = stream.offset;
                         Array.Clear(buffer, (int)streamdata.offset, (int)streamdata.size);
                     }
                 }
-
                 
                 file.stream.Position = 0;
                 file.stream.CopyTo(stream);

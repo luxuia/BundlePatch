@@ -914,7 +914,7 @@ namespace AssetStudio
         kHumanoid = 3
     };
 
-    public sealed class AnimationClip : NamedObject
+    public sealed class AnimationClip : NamedObject, IBuildinData
     {
         public AnimationType m_AnimationType;
         public bool m_Legacy;

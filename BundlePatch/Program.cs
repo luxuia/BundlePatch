@@ -13,7 +13,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
             Console.WriteLine("Hello World!");
 
             //var oldpath = "/Users/luxuia/Documents/Demo/Assets/tex";
-            var oldpath = ROOT_PATH + "Test/tex";
+            var oldpath = ROOT_PATH + "Test/monster_all.j";
 
             var assetsmanager = new AssetsManager();
             assetsmanager.LoadFiles(new string[] {oldpath});
@@ -66,6 +66,8 @@ namespace MyApp // Note: actual namespace depends on the project name.
             TestWriteBundleFile("Test/aoruola_terrain.j");
             TestWriteBundleFile("Test/aoruola_unity.j");
             */
+
+            /*
             foreach (var obj in topatchlist)
             {
                 switch (obj)
@@ -79,6 +81,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
                         break;
                 }
             }
+            */
         }
 
         static string ROOT_PATH = "../../../";
@@ -94,21 +97,30 @@ namespace MyApp // Note: actual namespace depends on the project name.
             var patchassetsmgr = new AssetsManager();
             patchassetsmgr.LoadFiles(newpath);
 
-            var topatchlist = new List<IExternalData>();
+            var topatchlist = new List<NamedObject>();
             foreach (var assetFile in assetsmanager.assetsFileList)
             {
                 foreach (var obj in assetFile.Objects)
                 {
                     if (PatchObjs.ContainsKey(obj.m_PathID))
                     {
+                        var namedobj = obj as NamedObject;
                         switch (obj)
                         {
                             case IExternalData exdata:
-                                var namedobj = obj as NamedObject;
-                                Console.WriteLine("tex2d, name {0} pathid: {1} offset {2} size {3} path {4} ",
+                              
+                                Console.WriteLine("IExternalData, name {0} pathid: {1} offset {2} size {3} path {4} type {5}",
                                     namedobj.m_Name, namedobj.m_PathID,
-                                    exdata.m_StreamData.offset, exdata.m_StreamData.size, exdata.m_StreamData.path);
-                                topatchlist.Add(exdata);
+                                    exdata.m_StreamData.offset, exdata.m_StreamData.size, exdata.m_StreamData.path,
+                                    obj.GetType());
+                                topatchlist.Add(namedobj);
+                                break;
+                            case IBuildinData:
+                                Console.WriteLine("IExternalData, name {0} pathid: {1} offset {2} size {3} path {4} type {5}",
+                                    namedobj.m_Name, namedobj.m_PathID,
+                                    namedobj.reader.byteStart, namedobj.reader.byteSize, namedobj.assetsFile.fileName,
+                                    obj.GetType());
+                                topatchlist.Add(namedobj);
                                 break;
                             default:
                                 break;
