@@ -12,12 +12,13 @@ namespace MyApp // Note: actual namespace depends on the project name.
         {
             Console.WriteLine("Hello World!");
 
-            var oldpath = "/Users/luxuia/Documents/Demo/Assets/tex";
+            //var oldpath = "/Users/luxuia/Documents/Demo/Assets/tex";
+            var oldpath = ROOT_PATH + "Test/tex";
 
             var assetsmanager = new AssetsManager();
             assetsmanager.LoadFiles(new string[] {oldpath});
 
-            var newpath = "/Users/luxuia/Documents/Demo/Assets/tex_new";
+            var newpath = ROOT_PATH + "Test/tex_new";
             var patchassetsmgr = new AssetsManager();
             patchassetsmgr.LoadFiles(new string[] { newpath });
 
@@ -54,10 +55,17 @@ namespace MyApp // Note: actual namespace depends on the project name.
                 }
             }
 
-            var ret = "/Users/luxuia/Documents/Demo/Assets/tex_patched";
+            //var ret = "/Users/luxuia/Documents/Demo/Assets/tex_patched";
 
-            TestWriteBundleFile();
+            TestWriteBundleFile("Test/tex", "Test/tex_new");
 
+            /*
+            TestWriteBundleFile("Test/prefab_new");
+            TestWriteBundleFile("Test/aoruola_lightmap.j");
+            TestWriteBundleFile("Test/aoruola_mmap_other.j");
+            TestWriteBundleFile("Test/aoruola_terrain.j");
+            TestWriteBundleFile("Test/aoruola_unity.j");
+            */
             foreach (var obj in topatchlist)
             {
                 switch (obj)
@@ -73,26 +81,55 @@ namespace MyApp // Note: actual namespace depends on the project name.
             }
         }
 
-
-        static void TestWriteBundleFile()
+        static string ROOT_PATH = "../../../";
+        static void TestWriteBundleFile(string name, string patch)
         {
-            var oldpath = "/Users/luxuia/Documents/Demo/Assets/tex";
-            var ret = "/Users/luxuia/Documents/Demo/Assets/tex_patched";
+            var oldpath = ROOT_PATH + name;
+
+            var assetsmanager = new AssetsManager();
+            assetsmanager.LoadFiles(oldpath);
+
+
+            var newpath = ROOT_PATH + patch;
+            var patchassetsmgr = new AssetsManager();
+            patchassetsmgr.LoadFiles(newpath);
+
+            var topatchlist = new List<IExternalData>();
+            foreach (var assetFile in assetsmanager.assetsFileList)
+            {
+                foreach (var obj in assetFile.Objects)
+                {
+                    if (PatchObjs.ContainsKey(obj.m_PathID))
+                    {
+                        switch (obj)
+                        {
+                            case IExternalData exdata:
+                                var namedobj = obj as NamedObject;
+                                Console.WriteLine("tex2d, name {0} pathid: {1} offset {2} size {3} path {4} ",
+                                    namedobj.m_Name, namedobj.m_PathID,
+                                    exdata.m_StreamData.offset, exdata.m_StreamData.size, exdata.m_StreamData.path);
+                                topatchlist.Add(exdata);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+
+            var ret = ROOT_PATH + name + "_patched";
             var reader = new FileReader(oldpath);
 
             var bundleFile = new BundleFile(reader);
 
             using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write))
             {
-                bundleFile.Write(streamer);
+                bundleFile.Write(streamer, topatchlist);
             }
 
 
-            var patchbundle = new BundleFile(new FileReader(ret));
-            foreach (var file in patchbundle.fileList)
-            {
-
-            }
+            var testassets = new AssetsManager();
+            testassets.LoadFiles(ret);
         }
     }
 }

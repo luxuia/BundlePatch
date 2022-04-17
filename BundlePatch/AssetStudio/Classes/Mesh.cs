@@ -444,7 +444,7 @@ namespace AssetStudio
         }
     }
 
-    public sealed class Mesh : NamedObject
+    public sealed class Mesh : NamedObject, IExternalData
     {
         private bool m_Use16BitIndices = true;
         public SubMesh[] m_SubMeshes;
@@ -468,7 +468,7 @@ namespace AssetStudio
         public float[] m_Tangents;
         private VertexData m_VertexData;
         private CompressedMesh m_CompressedMesh;
-        private StreamingInfo m_StreamData;
+        public StreamingInfo m_StreamData { get; set; }
 
         public List<uint> m_Indices = new List<uint>();
 

@@ -25,6 +25,15 @@ namespace AssetStudio
         }
     }
 
+    public interface IExternalData
+    {
+        public StreamingInfo m_StreamData
+        {
+            get;
+            set;
+        }
+    }
+
     public class GLTextureSettings
     {
         public int m_FilterMode;
@@ -52,7 +61,7 @@ namespace AssetStudio
         }
     }
 
-    public sealed class Texture2D : Texture
+    public sealed class Texture2D : Texture, IExternalData
     {
         public int m_Width;
         public int m_Height;
@@ -61,7 +70,7 @@ namespace AssetStudio
         public int m_MipCount;
         public GLTextureSettings m_TextureSettings;
         public ResourceReader image_data;
-        public StreamingInfo m_StreamData;
+        public StreamingInfo m_StreamData { get; set; }
 
         public Texture2D(ObjectReader reader) : base(reader)
         {

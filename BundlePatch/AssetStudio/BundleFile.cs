@@ -39,7 +39,7 @@ namespace AssetStudio
 
         public StreamFile[] fileList;
 
-        public EndianBinaryWriter Write(Stream stream)
+        public EndianBinaryWriter Write(Stream stream, List<IExternalData> topatchlist)
         {
             var writer = new EndianBinaryWriter(stream);
             writer.WriteStringNull(m_Header.signature);
@@ -59,7 +59,7 @@ namespace AssetStudio
              * 
              */
 
-            var blockData = GetBlockData();
+            var blockData = GetBlockData(topatchlist);
 
             var compressedBytes = new byte[m_Header.uncompressedBlocksInfoSize];
             var compressedSize = GetBlockInfo(compressedBytes);
@@ -79,13 +79,40 @@ namespace AssetStudio
             return writer;
         }
 
-        private byte[] GetBlockData()
+        private byte[] GetBlockData(List<IExternalData> topatchlist)
         {
+            Dictionary<string, List<IExternalData>> patchdic = new Dictionary<string, List<IExternalData>>();
+            foreach (var patch in topatchlist)
+            {
+                List<IExternalData> list;
+                var filename = Path.GetFileName(patch.m_StreamData.path);
+                if (!patchdic.TryGetValue(filename, out list))
+                {
+                    list = new List<IExternalData>();
+                }
+                list.Add(patch);
+                patchdic[filename] = list;
+            }
+
             var stream = new MemoryStream();
 
             foreach (var file in fileList)
             {
                 //file.stream.Seek(0, SeekOrigin.Begin);
+
+                List<IExternalData> list;
+                if (patchdic.TryGetValue(file.path, out list))
+                {
+                    var buffer = (file.stream as MemoryStream).GetBuffer();
+                    foreach (var patch in list)
+                    {
+                        var streamdata = patch.m_StreamData;
+                        //file.stream.Position = stream.offset;
+                        Array.Clear(buffer, (int)streamdata.offset, (int)streamdata.size);
+                    }
+                }
+
+                
                 file.stream.Position = 0;
                 file.stream.CopyTo(stream);
             }
@@ -98,6 +125,7 @@ namespace AssetStudio
 
             var retstream = new MemoryStream();
 
+            var blockidx = 0;
             while (stream.Position < stream.Length)
             {
                 var tarsize = Math.Min(BLOCK_SIZE, (int)(stream.Length - stream.Position));
@@ -106,6 +134,10 @@ namespace AssetStudio
                 
                 var encodesize = LZ4Codec.Encode(realuncompressed, compressed, LZ4Level.L12_MAX);
                 retstream.Write(compressed, 0, encodesize);
+
+                m_BlocksInfo[blockidx].compressedSize = (uint)encodesize;
+
+                blockidx++;
                 //BigArrayPool<byte>.Shared.Return(realuncompressed);
             }
 
