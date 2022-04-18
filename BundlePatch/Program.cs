@@ -31,15 +31,18 @@ namespace MyApp // Note: actual namespace depends on the project name.
                 .WithParsed<Options>(o =>
                {
                    var filepath = o.filePath.ToArray();
+
                    if (filepath.Length == 1)
                    {
                        Dump(filepath[0]);
-                   } else if (filepath.Length > 1)
+                   }
+                   else if (filepath.Length > 1)
                    {
                        if (o.eraser)
                        {
                            TestWriteBundleFile(filepath[0], filepath.TakeLast(filepath.Length - 1).ToArray());
-                       } else
+                       }
+                       else
                        {
                            TestDumpDiff(filepath[0], filepath.TakeLast(filepath.Length - 1).ToArray());
                        }
@@ -93,8 +96,8 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
             //TestWriteBundleFile("Test/role_monster.j",
             //    "Test/role_monster.patch.j");//,
-               // "Test/rd_role_monster.fbx.patch.j",
-                //"Test/rd_role_monster.tga.patch.j");
+            // "Test/rd_role_monster.fbx.patch.j",
+            //"Test/rd_role_monster.tga.patch.j");
 
             /*
             TestWriteBundleFile("Test/prefab_new");
@@ -125,7 +128,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
         {
             foreach (var patch in patches)
             {
-                var newpath = ROOT_PATH + patch;
+                var newpath = GetFilePath(patch);
                 var patchassetsmgr = new AssetsManager();
                 patchassetsmgr.LoadFiles(newpath);
                 foreach (var assetFile in patchassetsmgr.assetsFileList)
@@ -141,10 +144,18 @@ namespace MyApp // Note: actual namespace depends on the project name.
             }
         }
 
+        static string GetFilePath(string path)
+        {
+            if (File.Exists(path)) return path;
+
+            path = ROOT_PATH + path;
+            return path;
+        }
+
         static string ROOT_PATH = "../../../";
         static void TestWriteBundleFile(string name, params string[] patches)
         {
-            var oldpath = ROOT_PATH + name;
+            var oldpath = GetFilePath( name);
 
             var assetsmanager = new AssetsManager();
             assetsmanager.LoadFiles(oldpath);
@@ -183,7 +194,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
                 }
             }
 
-            var ret = ROOT_PATH + name + "_patched";
+            var ret = GetFilePath(name + "_patched");
             var reader = new FileReader(oldpath);
 
             var bundleFile = new BundleFile(reader);
@@ -200,7 +211,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
         static void TestDumpDiff(string name, params string[] patches)
         {
-            var oldpath = ROOT_PATH + name;
+            var oldpath = GetFilePath(name);
 
             var assetsmanager = new AssetsManager();
             assetsmanager.LoadFiles(oldpath);
@@ -243,7 +254,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
         static void Dump(string path)
         {
 
-            var newpath = ROOT_PATH + path;
+            var newpath = GetFilePath(path);
             var patchassetsmgr = new AssetsManager();
             patchassetsmgr.LoadFiles(newpath);
 
