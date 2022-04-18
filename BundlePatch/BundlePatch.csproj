@@ -10,9 +10,11 @@
   <ItemGroup>
     <None Remove="K4os.Compression.LZ4" />
     <None Remove="AssetStudio\" />
+    <None Remove="CommandLineParser" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="K4os.Compression.LZ4" Version="1.2.16" />
+    <PackageReference Include="CommandLineParser" Version="2.8.0" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="AssetStudio\" />
