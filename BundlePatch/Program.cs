@@ -1,17 +1,18 @@
 ﻿using System;
 using AssetStudio;
+using BundlePatch;
 
 namespace MyApp // Note: actual namespace depends on the project name.
 {
     internal class Program
     {
         static Dictionary<long, NamedObject> PatchObjs = new Dictionary<long, NamedObject>();
-        static Dictionary<long, NamedObject> OldObjs = new Dictionary<long, NamedObject>();
 
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            //Console.WriteLine("Hello World!");
 
+            /*
             //var oldpath = "/Users/luxuia/Documents/Demo/Assets/tex";
             var oldpath = ROOT_PATH + "Test/monster_all.j";
 
@@ -22,16 +23,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
             var patchassetsmgr = new AssetsManager();
             patchassetsmgr.LoadFiles(new string[] { newpath });
 
-            foreach (var assetFile in patchassetsmgr.assetsFileList)
-            {
-                foreach (var obj in assetFile.Objects)
-                {
-             
-                    PatchObjs.Add(obj.m_PathID, (NamedObject)obj);
-                }
-            }
-
-
+ 
             var topatchlist = new List<NamedObject>();
             foreach(var assetFile in assetsmanager.assetsFileList)
             {
@@ -54,10 +46,16 @@ namespace MyApp // Note: actual namespace depends on the project name.
                     }
                 }
             }
+            */
 
             //var ret = "/Users/luxuia/Documents/Demo/Assets/tex_patched";
 
-            TestWriteBundleFile("Test/tex", "Test/tex_new");
+            //TestWriteBundleFile("Test/tex", "Test/tex_new");
+
+            TestWriteBundleFile("Test/role_monster.j",
+                "Test/role_monster.patch.j");//,
+               // "Test/rd_role_monster.fbx.patch.j",
+                //"Test/rd_role_monster.tga.patch.j");
 
             /*
             TestWriteBundleFile("Test/prefab_new");
@@ -84,18 +82,36 @@ namespace MyApp // Note: actual namespace depends on the project name.
             */
         }
 
+        static void CollectPatchPath(string[] patches)
+        {
+            foreach (var patch in patches)
+            {
+                var newpath = ROOT_PATH + patch;
+                var patchassetsmgr = new AssetsManager();
+                patchassetsmgr.LoadFiles(newpath);
+                foreach (var assetFile in patchassetsmgr.assetsFileList)
+                {
+                    foreach (var obj in assetFile.Objects)
+                    {
+                        if (obj is IExternalData || obj is IBuildinData)
+                        {
+                            PatchObjs.Add(obj.m_PathID, (NamedObject)obj);
+                        }
+                    }
+                }
+            }
+        }
+
         static string ROOT_PATH = "../../../";
-        static void TestWriteBundleFile(string name, string patch)
+        static void TestWriteBundleFile(string name, params string[] patches)
         {
             var oldpath = ROOT_PATH + name;
 
             var assetsmanager = new AssetsManager();
             assetsmanager.LoadFiles(oldpath);
 
+            CollectPatchPath(patches);
 
-            var newpath = ROOT_PATH + patch;
-            var patchassetsmgr = new AssetsManager();
-            patchassetsmgr.LoadFiles(newpath);
 
             var topatchlist = new List<NamedObject>();
             foreach (var assetFile in assetsmanager.assetsFileList)
@@ -133,12 +149,11 @@ namespace MyApp // Note: actual namespace depends on the project name.
             var reader = new FileReader(oldpath);
 
             var bundleFile = new BundleFile(reader);
-
+            var patchmgr = new PatchMgr(bundleFile);
             using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write))
             {
-                bundleFile.Write(streamer, topatchlist);
+                patchmgr.Write(streamer, topatchlist);
             }
-
 
             var testassets = new AssetsManager();
             testassets.LoadFiles(ret);

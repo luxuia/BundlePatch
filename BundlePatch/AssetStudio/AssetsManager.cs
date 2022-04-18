@@ -13,8 +13,6 @@ namespace AssetStudio
         public string SpecifyUnityVersion;
         public List<SerializedFile> assetsFileList = new List<SerializedFile>();
 
-        public Dictionary<string, SerializedFile> assetsFileDic = new Dictionary<string, SerializedFile>(StringComparer.OrdinalIgnoreCase);
-
         internal Dictionary<string, int> assetsFileIndexCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, BinaryReader> resourceFileReaders = new Dictionary<string, BinaryReader>(StringComparer.OrdinalIgnoreCase);
 
@@ -104,7 +102,6 @@ namespace AssetStudio
                     var assetsFile = new SerializedFile(reader, this);
                     CheckStrippedVersion(assetsFile);
                     assetsFileList.Add(assetsFile);
-                    assetsFileDic.Add(reader.FileName, assetsFile);
                     assetsFileListHash.Add(assetsFile.fileName);
 
                     foreach (var sharedFile in assetsFile.m_Externals)
