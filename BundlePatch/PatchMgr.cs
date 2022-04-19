@@ -1,10 +1,24 @@
 ﻿using System;
 using AssetStudio;
 using K4os.Compression.LZ4;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace BundlePatch
 {
-	public class PatchMgr 
+    public class ObjectStreaming
+    {
+
+        public long offset; //ulong
+        public uint size;
+        public string path;
+
+        public string name;
+        public AssetStudio.Object obj;
+
+    }
+
+    public class PatchMgr 
 	{
         BundleFile bundle;
 		public PatchMgr(BundleFile bundle)
@@ -12,7 +26,15 @@ namespace BundlePatch
             this.bundle = bundle;
 		}
 
-        public EndianBinaryWriter Write(Stream stream, List<NamedObject> topatchlist)
+        static byte[] GetBytes(MemoryStream stream)
+        {
+            var ret = new byte[stream.Length];
+            stream.Position = 0;
+            stream.Read(ret);
+            return ret;
+        }
+
+        public EndianBinaryWriter Write(Stream stream, List<AssetStudio.Object> topatchlist = null, bool reshuffle = false)
         {
             var m_Header = bundle.m_Header;
 
@@ -34,73 +56,122 @@ namespace BundlePatch
              * 
              */
 
-            var blockData = GetBlockData(topatchlist);
+            var blockData = GetBlockData(topatchlist, reshuffle);
 
             var compressedBytes = new byte[m_Header.uncompressedBlocksInfoSize];
-            var compressedSize = GetBlockInfo(compressedBytes);
 
+            uint compressedSize = 0;
+            uint uncompressedSize = 0;
+            GetBlockInfo(compressedBytes, out uncompressedSize, out compressedSize);
 
-            writer.Write(m_Header.size);
+            var size = writer.Position
+                + Marshal.SizeOf(m_Header.size)
+                + Marshal.SizeOf(m_Header.compressedBlocksInfoSize)
+                + Marshal.SizeOf(m_Header.uncompressedBlocksInfoSize)
+                + Marshal.SizeOf(m_Header.flags);
+            // align
+            if (size % 16 != 0) size += (16 - (size % 16));
+
+            size += compressedSize + blockData.Length;
+
+            writer.Write(size);
             writer.Write(compressedSize);
-            writer.Write(m_Header.uncompressedBlocksInfoSize);
+            writer.Write(uncompressedSize);
             writer.Write(m_Header.flags);
 
             //BLOCK INFO
             writer.AlignStream(16);
 
-            writer.Write(compressedBytes, 0, compressedSize);
+            writer.Write(compressedBytes, 0, (int)compressedSize);
             writer.Write(blockData);
 
             return writer;
         }
 
-
-        private byte[] GetBlockData(List<NamedObject> topatchlist)
+        public static List<ObjectStreaming> GetStreamingDatas(AssetStudio.Object patch)
         {
-            Dictionary<string, List<StreamingInfo>> patchdic = new Dictionary<string, List<StreamingInfo>>();
-            foreach (var patch in topatchlist)
+            List<ObjectStreaming> list = new List<ObjectStreaming>();
+
+            var name = patch is NamedObject ? (patch as NamedObject).m_Name : patch.GetType().ToString();
+
+            list.Add(new ObjectStreaming()
             {
-                List<StreamingInfo> list;
-                var info = new StreamingInfo();
-                if (patch is IExternalData extdata && extdata.m_StreamData.size > 0)
+                path = patch.assetsFile.fileName,
+                offset = patch.reader.byteStart,
+                size = patch.reader.byteSize,
+                name = name,
+                obj = patch
+
+            });
+
+            if (patch is IExternalData extdata && extdata.m_StreamData.size > 0)
+            {
+                list.Add(new ObjectStreaming()
                 {
-                    info.path = Path.GetFileName(extdata.m_StreamData.path);
-                    info.offset = extdata.m_StreamData.offset;
-                    info.size = extdata.m_StreamData.size;
-                }
-                else if (patch is IBuildinData)
+                    path = Path.GetFileName(extdata.m_StreamData.path),
+                    offset = extdata.m_StreamData.offset,
+                    size = extdata.m_StreamData.size,
+                    name = name,
+                    obj = patch,
+                });
+            }
+            return list;
+        }
+
+        private byte[] GetBlockData(List<AssetStudio.Object> patchlist, bool reshuffle = true)
+        {
+            Dictionary<string, List<ObjectStreaming>> patchdic = new Dictionary<string, List<ObjectStreaming>>();
+            if (patchlist != null)
+            {
+                foreach (var patch in patchlist)
                 {
-                    info.path = patch.assetsFile.fileName;
-                    info.offset = patch.reader.byteStart;
-                    info.size = patch.reader.byteSize;
-                }
-                if (!string.IsNullOrEmpty(info.path))
-                {
-                    if (!patchdic.TryGetValue(info.path, out list))
+                    foreach (var info in GetStreamingDatas(patch))
                     {
-                        list = new List<StreamingInfo>();
+                        List<ObjectStreaming> list;
+                        if (!patchdic.TryGetValue(info.path, out list))
+                        {
+                            list = new List<ObjectStreaming>();
+                        }
+                        list.Add(info);
+                        patchdic[info.path] = list;
                     }
-                    list.Add(info);
-                    patchdic[info.path] = list;
                 }
             }
-
             var stream = new MemoryStream();
 
             var fileList = bundle.fileList;
 
+            var fileSize = new List<uint>();
+  
             foreach (var file in fileList)
             {
                 //file.stream.Seek(0, SeekOrigin.Begin);
+                var fileStreamLastPos = 0u;
 
-                List<StreamingInfo> list;
+                List<ObjectStreaming> list;
                 if (patchdic.TryGetValue(file.path, out list))
                 {
                     var buffer = (file.stream as MemoryStream).GetBuffer();
                     foreach (var streamdata in list)
                     {
-                        //file.stream.Position = stream.offset;
-                        Array.Clear(buffer, (int)streamdata.offset, (int)streamdata.size);
+                        if (reshuffle)
+                        {
+                            // block 0, serialize file Header
+                            if (fileStreamLastPos != streamdata.offset)
+                            {
+                                var size = (uint)streamdata.offset - fileStreamLastPos;
+                                fileSize.Add(size);
+                                Console.WriteLine("UnExcepect Streaming Data Offset Get: {0} Expect: {1}", streamdata.offset, fileStreamLastPos);
+                                fileStreamLastPos += size;
+                            }
+                            fileSize.Add(streamdata.size);
+                            fileStreamLastPos += streamdata.size;
+                        }
+                        else
+                        {
+                            //file.stream.Position = stream.offset;
+                            Array.Clear(buffer, (int)streamdata.offset, (int)streamdata.size);
+                        }
                     }
                 }
 
@@ -112,26 +183,53 @@ namespace BundlePatch
             //stream = new MemoryStream();
 
             int BLOCK_SIZE = 128 * 1024;
-            var compressed = new byte[BLOCK_SIZE];
+            if (fileSize.Count == 0)
+            {
+                var total = (int)stream.Length;
+                while (total > 0)
+                {
+                    var size = Math.Min(BLOCK_SIZE, total);
+                    fileSize.Add((uint)size);
+                    total -= size;
+                }
+            }
+
             var m_BlocksInfo = bundle.m_BlocksInfo;
 
+            var flags = bundle.m_BlocksInfo[0].flags;
+            var blocksinfo = new List<BundleFile.StorageBlock>();
+
             var retstream = new MemoryStream();
+            var fileidx = 0;
 
             var blockidx = 0;
-            while (stream.Position < stream.Length)
+            // 按文件分组压缩
+            while (fileidx < fileSize.Count)
             {
-                var tarsize = Math.Min(BLOCK_SIZE, (int)(stream.Length - stream.Position));
-                var realuncompressed = new byte[tarsize];
-                var readsize = stream.Read(realuncompressed, 0, tarsize);
+                uint compressedSize = 0;
+                int uncompressedSize = 0;
+                while (fileidx < fileSize.Count && (uncompressedSize + fileSize[fileidx] < BLOCK_SIZE || uncompressedSize == 0))
+                {
+                    uncompressedSize += (int)fileSize[fileidx];
+                    fileidx++;
+                }
 
+                var realuncompressed = new byte[uncompressedSize];
+                var compressed = new byte[uncompressedSize];
+                var readsize = stream.Read(realuncompressed, 0, uncompressedSize);
                 var encodesize = LZ4Codec.Encode(realuncompressed, compressed, LZ4Level.L12_MAX);
                 retstream.Write(compressed, 0, encodesize);
 
-                m_BlocksInfo[blockidx].compressedSize = (uint)encodesize;
+                blocksinfo.Add(new BundleFile.StorageBlock()
+                {
+                    compressedSize = (uint)encodesize,
+                    uncompressedSize = (uint)uncompressedSize,
+                    flags = flags,
+                });
 
-                blockidx++;
-                //BigArrayPool<byte>.Shared.Return(realuncompressed);
             }
+
+            bundle.m_BlocksInfo = blocksinfo.ToArray();
 
             var ret = new byte[retstream.Length];
             retstream.Position = 0;
@@ -139,14 +237,16 @@ namespace BundlePatch
             return ret;
         }
 
-        private int GetBlockInfo(byte[] compressedBytes)
+        private void GetBlockInfo(byte[] compressedBytes, out uint uncompressedSize, out uint compressedSize)
         {
             var m_Header = bundle.m_Header;
             var m_BlocksInfo = bundle.m_BlocksInfo;
             var m_DirectoryInfo = bundle.m_DirectoryInfo;
 
-            var blocksinfobytes = new byte[m_Header.uncompressedBlocksInfoSize];
-            var blocksinfostream = new MemoryStream(blocksinfobytes);
+            // = new byte[m_Header.uncompressedBlocksInfoSize];
+            var blocksinfostream = new MemoryStream();
+            byte[] blocksinfobytes;
+
             using (var blocksinfoWriter = new EndianBinaryWriter(blocksinfostream))
             {
                 blocksinfoWriter.Write(new byte[16]); // Hash
@@ -168,16 +268,17 @@ namespace BundlePatch
                     blocksinfoWriter.Write(node.flags);
                     blocksinfoWriter.WriteStringNull(node.path);
                 }
+                blocksinfobytes = GetBytes(blocksinfostream);
             }
-            var compressedSize = LZ4Codec.Encode(blocksinfobytes, compressedBytes, LZ4Level.L12_MAX);
 
-            Console.WriteLine(m_Header.compressedBlocksInfoSize);
+            compressedSize = (uint)LZ4Codec.Encode(blocksinfobytes, compressedBytes, LZ4Level.L12_MAX);
+            uncompressedSize = (uint)blocksinfobytes.Length;
+
             foreach (var compresst in (LZ4Level[])Enum.GetValues(typeof(LZ4Level)))
             {
                 var size = LZ4Codec.Encode(blocksinfobytes, compressedBytes, compresst);
                 Console.WriteLine("true : {0} type {1} now {2} ", m_Header.compressedBlocksInfoSize, compresst, size);
             }
-            return compressedSize;
         }
     }
 }
