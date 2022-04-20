@@ -43,32 +43,33 @@ namespace MyApp // Note: actual namespace depends on the project name.
                {
                    var filepath = o.filePath.ToArray();
 
-                   if (filepath.Length == 1)
+                   if (o.make_base)
                    {
-                       if (o.make_base)
+                       foreach (var path in filepath)
                        {
-                           MakeBase(filepath[0]);
-                       }
-                       else
-                       {
-                           Dump(filepath[0]);
+                           MakeBase(path);
                        }
                    }
-                   else if (filepath.Length > 1)
+                   else if (o.make_patch)
                    {
-                       if (o.make_patch)
+                       MakePatch(filepath[0], filepath[1]);
+                   }
+                   else if (o.clean)
+                   {
+                       CleanBundle(filepath[0], filepath.TakeLast(filepath.Length - 1).ToArray());
+                   }
+                   else if (o.diff)
+                   {
+                       DumpDiff(filepath[0], filepath.TakeLast(filepath.Length - 1).ToArray());
+                   }
+                   else
+                   {
+                       foreach (var path in filepath)
                        {
-                           MakePatch(filepath[0], filepath[1]);
-                       }
-                       else if (o.clean)
-                       {
-                           CleanBundle(filepath[0], filepath.TakeLast(filepath.Length - 1).ToArray());
-                       }
-                       else
-                       {
-                           DumpDiff(filepath[0], filepath.TakeLast(filepath.Length - 1).ToArray());
+                           Dump(path);
                        }
                    }
+
                }).WithNotParsed<Options>(e =>
                {
 
@@ -216,7 +217,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
             var ret = patchpath + "_patch";
             using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write | FileAccess.Read))
             {
-                patchmgr.Write(streamer, null);
+                patchmgr.Write(streamer, patchmgr.GetObjects());
 
                 streamer.Flush();
 
@@ -227,13 +228,15 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
 
                 var blocksinfo = patchmgr.bundle.m_BlocksInfo;
-                var patchblock_set = patchmgr.patchblock_set;
+                var patchblock_to_base = patchmgr.patchblock_to_base;
+                var baseblock_info = patchmgr.patchBaseInfo;
 
                 var block_data_offset = (int)patchmgr.key_offset[KeyStreamOffset.BlockData];
 
                 streamer.Position = 0;
 
-                var patch_data_mem = new MemoryStream();
+                var patch_data_mem = File.Open(patchpath + "_patch.bytes", FileMode.Create, FileAccess.Write);
+
                 var DUMMY_OFFSET = PatchUtil.DummyHeader.Length;
                 patch_data_mem.Write(System.Text.ASCIIEncoding.ASCII.GetBytes( PatchUtil.DummyHeader) );
                 patch_info_data.infos.Add(
@@ -242,38 +245,38 @@ namespace MyApp // Note: actual namespace depends on the project name.
                         size = block_data_offset,
                         is_patch = true
                     });
-                streamer.CopyTo(patch_data_mem, block_data_offset);
+
+                streamer.CopyLength(patch_data_mem, block_data_offset);
+                //streamer.CopyTo(patch_data_mem, block_data_offset);
                 
                 for (var blockidx = 0; blockidx < blocksinfo.Length; ++blockidx)
                 {
                     var blockinfo = blocksinfo[blockidx];
 
-                    var can_reused = patchblock_set.Contains(blockidx);
+                    var can_reused = patchblock_to_base.ContainsKey(blockidx);
                     long offset;
                 
                     if (can_reused)
                     {
-                        offset = streamer.Position;
+                        var baseblock = baseblock_info.block_pathids[patchblock_to_base[blockidx]];
+                        offset = baseblock.offset + baseblock_info.block_data_offset;
                         streamer.Seek(blockinfo.compressedSize, SeekOrigin.Current);
                     } else
                     {
                         offset = patch_data_mem.Position;
-                        streamer.CopyTo(patch_data_mem, blockinfo.compressedSize);
+                        streamer.CopyLength(patch_data_mem, (int)blockinfo.compressedSize);
                     }
                     patch_info_data.infos.Add(
                         new PatchUtil.PatchInfoData.Patch()
                         {
-                            offset = DUMMY_OFFSET + (int)offset,
+                            offset = (int)offset,
                             size = (int)blockinfo.compressedSize,
                             is_patch = !can_reused
                         });
                 }
 
-                using (var patch_file_stream = File.Open(patchpath + "_patch.bytes", FileMode.Create, FileAccess.Write))
-                {
-                    patch_data_mem.Position = 0;
-                    patch_data_mem.CopyTo(patch_file_stream);
-                }
+
+                patch_data_mem.Dispose();
 
                 var patch_str = JsonConvert.SerializeObject(patch_info_data, Formatting.Indented);
                 var patch_data_path = patchpath + "_patch.json";

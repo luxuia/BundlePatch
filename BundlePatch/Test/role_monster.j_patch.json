@@ -2,37 +2,32 @@
   "infos": [
     {
       "offset": 4,
-      "size": 185,
+      "size": 191,
       "is_patch": true
     },
     {
-      "offset": 353600,
-      "size": 55779,
+      "offset": 195,
+      "size": 14458,
+      "is_patch": true
+    },
+    {
+      "offset": 14649,
+      "size": 60958,
       "is_patch": false
     },
     {
-      "offset": 409379,
-      "size": 64244,
+      "offset": 75607,
+      "size": 110540,
       "is_patch": false
     },
     {
-      "offset": 473623,
-      "size": 65835,
+      "offset": 186147,
+      "size": 70662,
       "is_patch": false
     },
     {
-      "offset": 539458,
-      "size": 34971,
-      "is_patch": false
-    },
-    {
-      "offset": 574429,
-      "size": 56146,
-      "is_patch": false
-    },
-    {
-      "offset": 630575,
-      "size": 76436,
+      "offset": 256809,
+      "size": 92706,
       "is_patch": false
     }
   ],

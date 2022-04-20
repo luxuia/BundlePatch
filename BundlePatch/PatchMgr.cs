@@ -26,10 +26,12 @@ namespace BundlePatch
         {
             public List<long> pathids = new List<long>();
             public string md5;
+            public int offset;
         }
 
         public string name;
         public List<Pathids> block_pathids = new List<Pathids>();
+        public int block_data_offset;
     }
 
     public class PatchInfo
@@ -40,6 +42,7 @@ namespace BundlePatch
             public uint size;
             public int obj_first;
             public int obj_end;
+            public int base_block_idx;
         }
         public List<Patch> patchs = new List<Patch>();
     }
@@ -68,7 +71,7 @@ namespace BundlePatch
 
         //makePatch
         public PatchInfo patchinfo = new PatchInfo();
-        public HashSet<int> patchblock_set = new HashSet<int>();
+        public Dictionary<int, int> patchblock_to_base = new Dictionary<int, int>();
 
         public Dictionary<KeyStreamOffset, long> key_offset = new Dictionary<KeyStreamOffset, long>();
 
@@ -146,6 +149,7 @@ namespace BundlePatch
             writer.Write(compressedBytes, 0, (int)compressedSize);
 
             key_offset.Add(KeyStreamOffset.BlockData, writer.Position);
+            patchBaseInfo.block_data_offset = (int)writer.Position;
             writer.Write(blockData);
         }
 
@@ -298,16 +302,17 @@ namespace BundlePatch
                     }
                     fileidx++;
 
-                    if (patchmode == PatchMode.MakePatch)
+                    if (patchmode == PatchMode.MakePatch && patchinfo.patchs.Count > patchnodeidx)
                     {
+                        var patchblock_info = patchinfo.patchs[patchnodeidx];
                         // 下一个是patch的开始，打断
-                        if (patchinfo.patchs[patchnodeidx].obj_first == fileidx)
+                        if (patchblock_info.obj_first == fileidx)
                             break;
                         // 下一个是patch的结束，打断
-                        if (patchinfo.patchs[patchnodeidx].obj_end == fileidx)
+                        if (patchblock_info.obj_end == fileidx)
                         {
                             patchnodeidx++;
-                            patchblock_set.Add(blocksinfo.Count);
+                            patchblock_to_base[blocksinfo.Count] = patchblock_info.base_block_idx;
                             break;
                         }
                     }
@@ -325,6 +330,7 @@ namespace BundlePatch
                 var readsize = stream.Read(uncompressed, 0, uncompressedSize);
 
                 blockpathids.md5 = GetMd5(uncompressed);
+                blockpathids.offset = (int)retstream.Position;
 
                 var encodesize = LZ4Codec.Encode(uncompressed, compressed, LZ4Level.L12_MAX);
                 retstream.Write(compressed, 0, encodesize);
@@ -465,8 +471,9 @@ namespace BundlePatch
             {
                 var block = baseinfo.block_pathids[blockidx];
                 int last = -1;
-                long first_pathid = block.pathids[0];
-                int first = filePathId.FindIndex((a)=> { return first_pathid == a; });
+                int first_pathid_idx = block.pathids.FindIndex((a) => { return a != 0; });
+                long first_pathid = block.pathids[first_pathid_idx];
+                int first = filePathId.FindIndex((a)=> { return first_pathid == a; }) - first_pathid_idx;
 
                 if (first >= 0) {
                     bool fail = false;
@@ -500,7 +507,8 @@ namespace BundlePatch
                             offset = offset,
                             size = filesize,
                             obj_first = first,
-                            obj_end = first + block.pathids.Count
+                            obj_end = first + block.pathids.Count,
+                            base_block_idx = blockidx
                         });
                     }
                 }

@@ -1,7 +1,7 @@
 ﻿using System;
 namespace BundlePatch
 {
-	public class PatchUtil
+	public static class PatchUtil
 	{
 		public class PatchInfoData
 		{
@@ -24,9 +24,13 @@ namespace BundlePatch
 
 		public static string DummyHeader = "XX19";
 
-		public PatchUtil()
-		{
-		}
+		public static void CopyLength(this Stream stream, Stream tostream, int length)
+        {
+			var bytes = new byte[length];
+			stream.Read(bytes);
+
+			tostream.Write(bytes);
+        }
 	}
 }
 
