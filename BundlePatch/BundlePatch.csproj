@@ -11,10 +11,12 @@
     <None Remove="K4os.Compression.LZ4" />
     <None Remove="AssetStudio\" />
     <None Remove="CommandLineParser" />
+    <None Remove="Newtonsoft.Json" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="K4os.Compression.LZ4" Version="1.2.16" />
     <PackageReference Include="CommandLineParser" Version="2.8.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="AssetStudio\" />

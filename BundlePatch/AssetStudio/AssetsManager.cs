@@ -19,6 +19,8 @@ namespace AssetStudio
         private List<string> importFiles = new List<string>();
         private HashSet<string> importFilesHash = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private HashSet<string> assetsFileListHash = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        public Dictionary<string, BundleFile> bundleFiles = new Dictionary<string, BundleFile>();
         
 
         public void LoadFiles(params string[] files)
@@ -167,12 +169,20 @@ namespace AssetStudio
                 Logger.Info($"Skipping {originalPath} ({reader.FileName})");
         }
 
+        public BundleFile GetBundleFile(string path)
+        {
+            var filename = Path.GetFileName(path);
+            return bundleFiles[filename];
+        }
+
         private void LoadBundleFile(FileReader reader, string originalPath = null)
         {
             Logger.Info("Loading " + reader.FullPath);
             try
             {
                 var bundleFile = new BundleFile(reader);
+                bundleFiles[reader.FileName] = bundleFile;
+
                 foreach (var file in bundleFile.fileList)
                 {
                     var dummyPath = Path.Combine(Path.GetDirectoryName(reader.FullPath), file.fileName);

@@ -1,0 +1,44 @@
+{
+  "infos": [
+    {
+      "offset": 4,
+      "size": 185,
+      "is_patch": true
+    },
+    {
+      "offset": 353600,
+      "size": 55779,
+      "is_patch": false
+    },
+    {
+      "offset": 409379,
+      "size": 64244,
+      "is_patch": false
+    },
+    {
+      "offset": 473623,
+      "size": 65835,
+      "is_patch": false
+    },
+    {
+      "offset": 539458,
+      "size": 34971,
+      "is_patch": false
+    },
+    {
+      "offset": 574429,
+      "size": 56146,
+      "is_patch": false
+    },
+    {
+      "offset": 630575,
+      "size": 76436,
+      "is_patch": false
+    }
+  ],
+  "srcFileName": "../../../Test/role_monster.j",
+  "dstFileName": "../../../Test/role_monster.j",
+  "patchFileName": "../../../Test/role_monster.j",
+  "srcMD5": null,
+  "dstMD5": null
+}

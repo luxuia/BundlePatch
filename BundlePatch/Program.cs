@@ -2,6 +2,7 @@
 using AssetStudio;
 using BundlePatch;
 using CommandLine;
+using Newtonsoft.Json;
 
 namespace MyApp // Note: actual namespace depends on the project name.
 {
@@ -14,14 +15,17 @@ namespace MyApp // Note: actual namespace depends on the project name.
             [Value(0)]
             public IEnumerable<string> filePath { get; set; }
 
-            [Option('e', "eraser")]
-            public bool eraser { get; set; }
+            [Option('c', "clean")]
+            public bool clean { get; set; }
 
             [Option('d', "diff")]
             public bool diff { get; set; }
 
-            [Option('r', "reshuffle")]
-            public bool reshuffle { get; set; }
+            [Option('b', "base")]
+            public bool make_base { get; set; }
+
+            [Option('p', "patch")]
+            public bool make_patch { get; set; }
         }
 
         static void Main(string[] args)
@@ -32,7 +36,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
             //"Test/rd_role_monster.tga.patch.j"
             args = new string[]
             {
-                "Test/tex", "-r"
+                "Test/role_monster.j", "Test/role_monster.j", "-p"
             };
             CommandLine.Parser.Default.ParseArguments<Options>(args)
                 .WithParsed<Options>(o =>
@@ -41,9 +45,9 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
                    if (filepath.Length == 1)
                    {
-                       if (o.reshuffle)
+                       if (o.make_base)
                        {
-                           Reshuffle(filepath[0]);
+                           MakeBase(filepath[0]);
                        }
                        else
                        {
@@ -52,9 +56,13 @@ namespace MyApp // Note: actual namespace depends on the project name.
                    }
                    else if (filepath.Length > 1)
                    {
-                       if (o.eraser)
+                       if (o.make_patch)
                        {
-                           EraserBundle(filepath[0], filepath.TakeLast(filepath.Length - 1).ToArray());
+                           MakePatch(filepath[0], filepath[1]);
+                       }
+                       else if (o.clean)
+                       {
+                           CleanBundle(filepath[0], filepath.TakeLast(filepath.Length - 1).ToArray());
                        }
                        else
                        {
@@ -115,7 +123,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
         }
 
         static string ROOT_PATH = "../../../";
-        static void EraserBundle(string name, params string[] patches)
+        static void CleanBundle(string name, params string[] patches)
         {
             var oldpath = GetFilePath( name);
 
@@ -137,13 +145,11 @@ namespace MyApp // Note: actual namespace depends on the project name.
             }
 
             var ret = GetFilePath(name + "_patched");
-            var reader = new FileReader(oldpath);
-
-            var bundleFile = new BundleFile(reader);
-            var patchmgr = new PatchMgr(bundleFile);
+  
+            var patchmgr = new PatchMgr(oldpath, PatchMode.CleanBundle);
             using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write))
             {
-                patchmgr.Write(streamer, patchedlist, false);
+                patchmgr.Write(streamer, patchedlist);
             }
 
             var testassets = new AssetsManager();
@@ -178,34 +184,101 @@ namespace MyApp // Note: actual namespace depends on the project name.
             }
         }
 
-        static void Reshuffle(string name)
+        static void MakeBase(string name)
         {
             var path = GetFilePath(name);
-            var reader = new FileReader(path);
 
-            var bundleFile = new BundleFile(reader);
-            var patchmgr = new PatchMgr(bundleFile);
-
-
-            var assetsmanager = new AssetsManager();
-            assetsmanager.LoadFiles(path);
-            var patchedlist = new List<AssetStudio.Object>();
-            foreach (var assetFile in assetsmanager.assetsFileList)
-            {
-                foreach (var obj in assetFile.Objects)
-                {
-                    patchedlist.Add(obj);
-                }
-            }
+            var patchmgr = new PatchMgr(path, PatchMode.MakeBase);
 
             var ret = path + "_base";
             using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write))
             {
-                patchmgr.Write(streamer, patchedlist, true);
+                patchmgr.Write(streamer, patchmgr.GetObjects());
             }
 
             var testassets = new AssetsManager();
             testassets.LoadFiles(ret);
+
+            patchmgr.patchBaseInfo.name = Path.GetFileName(path);
+
+            var json = JsonConvert.SerializeObject(patchmgr.patchBaseInfo);
+            File.WriteAllText(ret + ".json", json);
+        }
+
+        static void MakePatch(string basepath, string patchpath)
+        {
+            basepath = GetFilePath(basepath);
+            patchpath = GetFilePath(patchpath);
+
+            var patchmgr = new PatchMgr(patchpath, PatchMode.MakePatch);
+            patchmgr.CalPatchInfo(basepath + "_base");
+
+            var ret = patchpath + "_patch";
+            using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write | FileAccess.Read))
+            {
+                patchmgr.Write(streamer, null);
+
+                streamer.Flush();
+
+                var patch_info_data = new PatchUtil.PatchInfoData();
+                patch_info_data.srcFileName = patchpath;
+                patch_info_data.dstFileName = patchpath;
+                patch_info_data.patchFileName = patchpath;
+
+
+                var blocksinfo = patchmgr.bundle.m_BlocksInfo;
+                var patchblock_set = patchmgr.patchblock_set;
+
+                var block_data_offset = (int)patchmgr.key_offset[KeyStreamOffset.BlockData];
+
+                streamer.Position = 0;
+
+                var patch_data_mem = new MemoryStream();
+                var DUMMY_OFFSET = PatchUtil.DummyHeader.Length;
+                patch_data_mem.Write(System.Text.ASCIIEncoding.ASCII.GetBytes( PatchUtil.DummyHeader) );
+                patch_info_data.infos.Add(
+                    new PatchUtil.PatchInfoData.Patch() {
+                        offset = DUMMY_OFFSET,
+                        size = block_data_offset,
+                        is_patch = true
+                    });
+                streamer.CopyTo(patch_data_mem, block_data_offset);
+                
+                for (var blockidx = 0; blockidx < blocksinfo.Length; ++blockidx)
+                {
+                    var blockinfo = blocksinfo[blockidx];
+
+                    var can_reused = patchblock_set.Contains(blockidx);
+                    long offset;
+                
+                    if (can_reused)
+                    {
+                        offset = streamer.Position;
+                        streamer.Seek(blockinfo.compressedSize, SeekOrigin.Current);
+                    } else
+                    {
+                        offset = patch_data_mem.Position;
+                        streamer.CopyTo(patch_data_mem, blockinfo.compressedSize);
+                    }
+                    patch_info_data.infos.Add(
+                        new PatchUtil.PatchInfoData.Patch()
+                        {
+                            offset = DUMMY_OFFSET + (int)offset,
+                            size = (int)blockinfo.compressedSize,
+                            is_patch = !can_reused
+                        });
+                }
+
+                using (var patch_file_stream = File.Open(patchpath + "_patch.bytes", FileMode.Create, FileAccess.Write))
+                {
+                    patch_data_mem.Position = 0;
+                    patch_data_mem.CopyTo(patch_file_stream);
+                }
+
+                var patch_str = JsonConvert.SerializeObject(patch_info_data, Formatting.Indented);
+                var patch_data_path = patchpath + "_patch.json";
+                File.WriteAllText(patch_data_path, patch_str);
+            }
         }
 
         static void Dump(string path)
