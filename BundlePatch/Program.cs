@@ -40,7 +40,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
             args = new string[]
             {
                // "Test/role_monster.j_base", "Test/role_monster.j_patch.bytes", "-a"
-               "Test/prefab", "Test/prefab1", "-p"
+               "Test/aoruola_unity.patch.j"
                //"Test/prefab", "-b"
             };
             CommandLine.Parser.Default.ParseArguments<Options>(args)

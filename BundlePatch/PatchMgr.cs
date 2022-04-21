@@ -159,7 +159,7 @@ namespace BundlePatch
         {
             List<ObjectStreaming> list = new List<ObjectStreaming>();
 
-            var name = patch is NamedObject ? (patch as NamedObject).m_Name : patch.GetType().ToString();
+            var name = patch is IGetName ? (patch as IGetName).m_Name : patch.GetType().ToString();
 
             list.Add(new ObjectStreaming()
             {

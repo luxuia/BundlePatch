@@ -5,10 +5,10 @@ using System.Text;
 
 namespace AssetStudio
 {
-    public sealed class GameObject : EditorExtension
+    public sealed class GameObject : EditorExtension, IGetName
     {
         public PPtr<Component>[] m_Components;
-        public string m_Name;
+        public string m_Name { get; set; }
 
         public Transform m_Transform;
         public MeshRenderer m_MeshRenderer;
