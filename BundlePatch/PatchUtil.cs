@@ -31,6 +31,16 @@ namespace BundlePatch
 
 			tostream.Write(bytes);
         }
+
+		public static string GetBaseName(string path)
+        {
+			return path + ".base";
+        }
+
+		public static string GetPatchName(string path)
+        {
+			return path + ".bytes";
+        }
 	}
 }
 

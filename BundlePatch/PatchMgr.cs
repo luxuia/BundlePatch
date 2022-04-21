@@ -27,6 +27,8 @@ namespace BundlePatch
             public List<long> pathids = new List<long>();
             public string md5;
             public int offset;
+            public int uncompress_size;
+            public int compress_size;
         }
 
         public string name;
@@ -323,17 +325,21 @@ namespace BundlePatch
                         break;
                     }
 
-                } while (fileidx < fileSize.Count && uncompressedSize < BLOCK_SIZE);
+                } while (fileidx < fileSize.Count && (uncompressedSize + (int)fileSize[fileidx] <= BLOCK_SIZE));
 
                 var uncompressed = new byte[uncompressedSize];
                 var compressed = new byte[uncompressedSize];
                 var readsize = stream.Read(uncompressed, 0, uncompressedSize);
 
-                blockpathids.md5 = GetMd5(uncompressed);
-                blockpathids.offset = (int)retstream.Position;
+       
 
                 var encodesize = LZ4Codec.Encode(uncompressed, compressed, LZ4Level.L12_MAX);
                 retstream.Write(compressed, 0, encodesize);
+
+                blockpathids.md5 = GetMd5(uncompressed);
+                blockpathids.offset = (int)retstream.Position;
+                blockpathids.uncompress_size = (int)uncompressedSize;
+                blockpathids.compress_size = encodesize;
 
                 blocksinfo.Add(new BundleFile.StorageBlock()
                 {
@@ -473,9 +479,14 @@ namespace BundlePatch
                 int last = -1;
                 int first_pathid_idx = block.pathids.FindIndex((a) => { return a != 0; });
                 long first_pathid = block.pathids[first_pathid_idx];
-                int first = filePathId.FindIndex((a)=> { return first_pathid == a; }) - first_pathid_idx;
+                int find_idx = 0;
 
-                if (first >= 0) {
+                //一个patchid会对应多个区段
+                while (filePathId.IndexOf(first_pathid, find_idx) >= 0)
+                {
+                    var first = filePathId.IndexOf(first_pathid, find_idx) - first_pathid_idx;
+                    find_idx = first+1;
+
                     bool fail = false;
                     var filesize = 0u;
                     // 检查pathid能对上
@@ -510,6 +521,7 @@ namespace BundlePatch
                             obj_end = first + block.pathids.Count,
                             base_block_idx = blockidx
                         });
+                        break;
                     }
                 }
             }

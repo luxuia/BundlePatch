@@ -26,6 +26,9 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
             [Option('p', "patch")]
             public bool make_patch { get; set; }
+
+            [Option('a', "apply")]
+            public bool apply { get; set; }
         }
 
         static void Main(string[] args)
@@ -36,7 +39,9 @@ namespace MyApp // Note: actual namespace depends on the project name.
             //"Test/rd_role_monster.tga.patch.j"
             args = new string[]
             {
-                "Test/role_monster.j", "Test/role_monster.j", "-p"
+               // "Test/role_monster.j_base", "Test/role_monster.j_patch.bytes", "-a"
+               "Test/prefab", "Test/prefab1", "-p"
+               //"Test/prefab", "-b"
             };
             CommandLine.Parser.Default.ParseArguments<Options>(args)
                 .WithParsed<Options>(o =>
@@ -61,6 +66,10 @@ namespace MyApp // Note: actual namespace depends on the project name.
                    else if (o.diff)
                    {
                        DumpDiff(filepath[0], filepath.TakeLast(filepath.Length - 1).ToArray());
+                   }
+                   else if (o.apply)
+                   {
+                       ApplyPatch(filepath[0], filepath[1]);
                    }
                    else
                    {
@@ -145,7 +154,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
                 }
             }
 
-            var ret = GetFilePath(name + "_patched");
+            var ret = GetFilePath(name + ".clean");
   
             var patchmgr = new PatchMgr(oldpath, PatchMode.CleanBundle);
             using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write))
@@ -191,7 +200,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
             var patchmgr = new PatchMgr(path, PatchMode.MakeBase);
 
-            var ret = path + "_base";
+            var ret = PatchUtil.GetBaseName(path);;
             using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write))
             {
                 patchmgr.Write(streamer, patchmgr.GetObjects());
@@ -208,23 +217,25 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
         static void MakePatch(string basepath, string patchpath)
         {
-            basepath = GetFilePath(basepath);
+            basepath = PatchUtil.GetBaseName(GetFilePath(basepath));
             patchpath = GetFilePath(patchpath);
 
             var patchmgr = new PatchMgr(patchpath, PatchMode.MakePatch);
-            patchmgr.CalPatchInfo(basepath + "_base");
+            patchmgr.CalPatchInfo(basepath);
 
-            var ret = patchpath + "_patch";
+            var ret = patchpath + ".patch";
             using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write | FileAccess.Read))
             {
                 patchmgr.Write(streamer, patchmgr.GetObjects());
 
                 streamer.Flush();
 
+                var patchbytes_name = PatchUtil.GetPatchName(patchpath);
+
                 var patch_info_data = new PatchUtil.PatchInfoData();
-                patch_info_data.srcFileName = patchpath;
+                patch_info_data.srcFileName = basepath;
                 patch_info_data.dstFileName = patchpath;
-                patch_info_data.patchFileName = patchpath;
+                patch_info_data.patchFileName = patchbytes_name;
 
 
                 var blocksinfo = patchmgr.bundle.m_BlocksInfo;
@@ -235,7 +246,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
                 streamer.Position = 0;
 
-                var patch_data_mem = File.Open(patchpath + "_patch.bytes", FileMode.Create, FileAccess.Write);
+                var patch_data_mem = File.Open(patchbytes_name, FileMode.Create, FileAccess.Write);
 
                 var DUMMY_OFFSET = PatchUtil.DummyHeader.Length;
                 patch_data_mem.Write(System.Text.ASCIIEncoding.ASCII.GetBytes( PatchUtil.DummyHeader) );
@@ -279,8 +290,36 @@ namespace MyApp // Note: actual namespace depends on the project name.
                 patch_data_mem.Dispose();
 
                 var patch_str = JsonConvert.SerializeObject(patch_info_data, Formatting.Indented);
-                var patch_data_path = patchpath + "_patch.json";
+                var patch_data_path = ret + ".json";
                 File.WriteAllText(patch_data_path, patch_str);
+            }
+        }
+
+        static void ApplyPatch(string basepath, string patchpath)
+        {
+            basepath = GetFilePath(basepath);
+            patchpath = GetFilePath(patchpath);
+
+            var patchjson_path = patchpath.Replace(".bytes", ".json");
+            var patchjson_str = File.ReadAllText(patchjson_path);
+            var patch_info_data = JsonConvert.DeserializeObject<PatchUtil.PatchInfoData>(patchjson_str);
+
+            var basefile = File.ReadAllBytes(basepath);
+            var patchfile = File.ReadAllBytes(patchpath);
+
+            using (var patch_stream = File.OpenWrite(patchpath + ".patch"))
+            {
+                foreach (var info in patch_info_data.infos)
+                {
+                    if (info.is_patch)
+                    {
+                        patch_stream.Write(patchfile, info.offset, info.size);
+                    } else
+                    {
+                        patch_stream.Write(basefile, info.offset, info.size);
+                    }
+                }
+
             }
         }
 

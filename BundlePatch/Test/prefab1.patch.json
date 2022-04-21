@@ -1,0 +1,34 @@
+{
+  "infos": [
+    {
+      "offset": 4,
+      "size": 180,
+      "is_patch": true
+    },
+    {
+      "offset": 184,
+      "size": 13636,
+      "is_patch": true
+    },
+    {
+      "offset": 13820,
+      "size": 58625,
+      "is_patch": true
+    },
+    {
+      "offset": 72445,
+      "size": 752,
+      "is_patch": true
+    },
+    {
+      "offset": 236440,
+      "size": 163247,
+      "is_patch": false
+    }
+  ],
+  "srcFileName": "../../../Test/prefab.base",
+  "dstFileName": "../../../Test/prefab1",
+  "patchFileName": "../../../Test/prefab1.bytes",
+  "srcMD5": null,
+  "dstMD5": null
+}
