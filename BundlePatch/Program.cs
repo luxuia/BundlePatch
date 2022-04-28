@@ -111,8 +111,10 @@ namespace MyApp // Note: actual namespace depends on the project name.
 
         static void CollectPatchPath(string[] patches)
         {
+            patches = patches.Distinct().ToArray();
             foreach (var patch in patches)
             {
+                Console.WriteLine("CollectPatchPath : " + patch);
                 var newpath = GetFilePath(patch);
                 var patchassetsmgr = new AssetsManager();
                 patchassetsmgr.LoadFiles(newpath);
@@ -122,7 +124,6 @@ namespace MyApp // Note: actual namespace depends on the project name.
                     {
                         //if (obj is IExternalData || obj is IBuildinData)
                         PatchObjs.Add(obj.m_PathID, obj);
-
                     }
                 }
             }
