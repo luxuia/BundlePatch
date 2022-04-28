@@ -5,6 +5,8 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using System.IO;
+using System.Collections.Generic;
 
 namespace BundlePatch
 {

@@ -3,6 +3,10 @@ using AssetStudio;
 using BundlePatch;
 using CommandLine;
 using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.IO;
+using System.Collections;
+using System.Linq;
 
 namespace MyApp // Note: actual namespace depends on the project name.
 {
@@ -37,12 +41,12 @@ namespace MyApp // Note: actual namespace depends on the project name.
             //    "Test/role_monster.patch.j");//,
             // "Test/rd_role_monster.fbx.patch.j",
             //"Test/rd_role_monster.tga.patch.j"
-            args = new string[]
-            {
-               // "Test/role_monster.j_base", "Test/role_monster.j_patch.bytes", "-a"
-               "Test/aoruola_unity.patch.j"
-               //"Test/prefab", "-b"
-            };
+            //args = new string[]
+            //{
+            //   // "Test/role_monster.j_base", "Test/role_monster.j_patch.bytes", "-a"
+            //   "Test/aoruola_unity.patch.j"
+            //   //"Test/prefab", "-b"
+            //};
             CommandLine.Parser.Default.ParseArguments<Options>(args)
                 .WithParsed<Options>(o =>
                {

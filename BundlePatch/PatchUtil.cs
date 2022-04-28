@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
+
 namespace BundlePatch
 {
 	public static class PatchUtil
