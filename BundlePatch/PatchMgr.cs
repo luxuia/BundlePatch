@@ -173,7 +173,8 @@ namespace BundlePatch
 
             });
 
-            if (patch is IExternalData extdata && extdata.m_StreamData.size > 0)
+            // m_StreamData == null, in file texture
+            if (patch is IExternalData extdata && extdata.m_StreamData != null && extdata.m_StreamData.size > 0)
             {
                 list.Add(new ObjectStreaming()
                 {
@@ -287,7 +288,6 @@ namespace BundlePatch
             // 按文件分组压缩
             while (fileidx < fileSize.Count)
             {
-                uint compressedSize = 0;
                 int uncompressedSize = 0;
                 var blockidx = blocksinfo.Count;
 
@@ -333,11 +333,17 @@ namespace BundlePatch
                 var compressed = new byte[uncompressedSize];
                 var readsize = stream.Read(uncompressed, 0, uncompressedSize);
 
-       
-
                 var encodesize = LZ4Codec.Encode(uncompressed, compressed, LZ4Level.L12_MAX);
-                retstream.Write(compressed, 0, encodesize);
-
+                bool isCompressed = encodesize > 0;
+                if (isCompressed)
+                {
+                    retstream.Write(compressed, 0, encodesize);
+                } else
+                {
+                    // 有些资源压缩后会更大，就不压缩
+                    retstream.Write(uncompressed, 0, uncompressedSize);
+                    encodesize = uncompressedSize;
+                }
                 blockpathids.md5 = GetMd5(uncompressed);
                 blockpathids.offset = (int)retstream.Position;
                 blockpathids.uncompress_size = (int)uncompressedSize;
@@ -347,7 +353,7 @@ namespace BundlePatch
                 {
                     compressedSize = (uint)encodesize,
                     uncompressedSize = (uint)uncompressedSize,
-                    flags = flags,
+                    flags = isCompressed ? (ushort)3 : (ushort)0,
                 });
          
             }

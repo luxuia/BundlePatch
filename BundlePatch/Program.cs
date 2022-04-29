@@ -12,8 +12,6 @@ namespace MyApp // Note: actual namespace depends on the project name.
 {
     internal class Program
     {
-        static Dictionary<long, AssetStudio.Object> PatchObjs = new Dictionary<long, AssetStudio.Object>();
-
         class Options
         {
             [Value(0)]
@@ -41,12 +39,12 @@ namespace MyApp // Note: actual namespace depends on the project name.
             //    "Test/role_monster.patch.j");//,
             // "Test/rd_role_monster.fbx.patch.j",
             //"Test/rd_role_monster.tga.patch.j"
-            //args = new string[]
-            //{
-            //   // "Test/role_monster.j_base", "Test/role_monster.j_patch.bytes", "-a"
-            //   "Test/aoruola_unity.patch.j"
-            //   //"Test/prefab", "-b"
-            //};
+           //args = new string[]
+           //{
+           //   // "Test/role_monster.j_base", "Test/role_monster.j_patch.bytes", "-a"
+           //   @"D:\x19_bundles\android\bundles\map_scene_zhanchang_fbx_materials.j", @"D:/x19_bundles/android/patches/maps_scene_teshu_zhanchang_fbx_materials_zc_terrain_1_control.tga.patch.j", "--clean"
+           //   //"Test/prefab", "-b"
+           //};
             CommandLine.Parser.Default.ParseArguments<Options>(args)
                 .WithParsed<Options>(o =>
                {
@@ -109,9 +107,10 @@ namespace MyApp // Note: actual namespace depends on the project name.
             */
         }
 
-        static void CollectPatchPath(string[] patches)
+        static HashSet<long> CollectPatchPath(string[] patches)
         {
             patches = patches.Distinct().ToArray();
+            var patchHash = new HashSet<long>();
             foreach (var patch in patches)
             {
                 Console.WriteLine("CollectPatchPath : " + patch);
@@ -123,14 +122,16 @@ namespace MyApp // Note: actual namespace depends on the project name.
                     foreach (var obj in assetFile.Objects)
                     {
                         //if (obj is IExternalData || obj is IBuildinData)
-                        PatchObjs.Add(obj.m_PathID, obj);
+                        patchHash.Add(obj.m_PathID);
                     }
                 }
             }
+            return patchHash;
         }
 
         static string GetFilePath(string path)
         {
+            Console.WriteLine("GetFilePath " + path + " Exist: " + File.Exists(path));
             if (File.Exists(path)) return path;
 
             path = ROOT_PATH + path;
@@ -145,21 +146,21 @@ namespace MyApp // Note: actual namespace depends on the project name.
             var assetsmanager = new AssetsManager();
             assetsmanager.LoadFiles(oldpath);
 
-            CollectPatchPath(patches);
+            var patched = CollectPatchPath(patches);
 
             var patchedlist = new List<AssetStudio.Object>();
             foreach (var assetFile in assetsmanager.assetsFileList)
             {
                 foreach (var obj in assetFile.Objects)
                 {
-                    if (PatchObjs.ContainsKey(obj.m_PathID))
+                    if (obj.m_PathID != 1 && patched.Contains(obj.m_PathID))
                     {
                         patchedlist.Add(obj);
                     }
                 }
             }
 
-            var ret = GetFilePath(name + ".clean");
+            var ret = oldpath + ".clean";
   
             var patchmgr = new PatchMgr(oldpath, PatchMode.CleanBundle);
             using (var streamer = File.Open(ret, FileMode.Create, FileAccess.Write))
@@ -179,14 +180,14 @@ namespace MyApp // Note: actual namespace depends on the project name.
             var assetsmanager = new AssetsManager();
             assetsmanager.LoadFiles(oldpath);
 
-            CollectPatchPath(patches);
+            var patched = CollectPatchPath(patches);
 
             var topatchlist = new List<NamedObject>();
             foreach (var assetFile in assetsmanager.assetsFileList)
             {
                 foreach (var obj in assetFile.Objects)
                 {
-                    if (PatchObjs.ContainsKey(obj.m_PathID))
+                    if (patched.Contains(obj.m_PathID))
                     {
                         foreach (var info in PatchMgr.GetStreamingDatas(obj))
                         {
