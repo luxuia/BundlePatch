@@ -121,8 +121,13 @@ namespace MyApp // Note: actual namespace depends on the project name.
                 {
                     foreach (var obj in assetFile.Objects)
                     {
-                        //if (obj is IExternalData || obj is IBuildinData)
-                        patchHash.Add(obj.m_PathID);
+                        if (obj is MonoScript|| obj.m_PathID == 1)
+                        {
+                        }
+                        else { 
+                            //if (obj is IExternalData || obj is IBuildinData)
+                            patchHash.Add(obj.m_PathID);
+                        }
                     }
                 }
             }
@@ -153,7 +158,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
             {
                 foreach (var obj in assetFile.Objects)
                 {
-                    if (obj.m_PathID != 1 && patched.Contains(obj.m_PathID))
+                    if (patched.Contains(obj.m_PathID))
                     {
                         patchedlist.Add(obj);
                     }
@@ -336,33 +341,36 @@ namespace MyApp // Note: actual namespace depends on the project name.
             var patchassetsmgr = new AssetsManager();
             patchassetsmgr.LoadFiles(newpath);
 
+            var builder = new System.Text.StringBuilder();
             foreach (var assetFile in patchassetsmgr.assetsFileList)
             {
-                Console.Write("Serialize File {0}", assetFile.fileName);
+                builder.AppendFormat("Serialize File {0}", assetFile.fileName);
 
-                Console.WriteLine("Can Patch Info:");
+                builder.AppendLine("Can Patch Info:");
                 foreach (var obj in assetFile.Objects)
                 {
                     foreach (var info in PatchMgr.GetStreamingDatas(obj))
                     {
                         //PatchObjs.Add(obj.m_PathID, (NamedObject)obj);
-                        Console.WriteLine("    type: {0} name: {1} pathid: {2} file: {3} offset: {4} size: {5}",
-                            obj.GetType(), info.name, obj.m_PathID, info.path, info.offset, info.size);
+                        builder.AppendLine(string.Format("file: {3} \t pathid: {2} \t type: {0} \t name: {1} \t offset: {4} size: {5}",
+                            obj.GetType(), info.name, obj.m_PathID, info.path, info.offset, info.size));
                     }
                 }
 
                 if (assetFile.m_Externals.Count > 0)
                 {
-                    Console.WriteLine("External Info:");
+                    builder.AppendLine("External Info:");
                     foreach (var external in assetFile.m_Externals)
                     {
-                        Console.WriteLine("filename: {0} pathname: {1}", external.fileName, external.pathName);
+                        builder.AppendLine(string.Format("filename: {0} pathname: {1}", external.fileName, external.pathName));
                     }
                 }
-                Console.WriteLine();
+                builder.AppendLine();
             }
+            var text = builder.ToString();
+            Console.Write(text);
 
-
+            File.WriteAllText(newpath + ".dump", text);
         }
     }
 }
